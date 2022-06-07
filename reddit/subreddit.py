@@ -1,72 +1,94 @@
-#!/usr/bin/env python3
-from rich.console import Console
-from utils.console import print_step, print_substep
-from dotenv import load_dotenv
-import os
 import random
-import praw
+import os
 import re
 
-console = Console()
+import praw
+from prawcore.exceptions import (
+    OAuthException,
+    ResponseException,
+    RequestException,
+    BadRequest
+)
+from dotenv import load_dotenv
+from rich.console import Console
+
+from utils.console import print_step, print_substep
 
 
-def get_subreddit_threads():
-    global submission
+def get_subreddit_threads(subreddit_, thread_link_):
     """
+    Takes subreddit_ as parameter which defaults to None, but in this
+    case since it is None, it would raise ValueError, thus defaulting
+    to AskReddit.
+
     Returns a list of threads from the AskReddit subreddit.
     """
 
+    console = Console()
+
+    global submission
     load_dotenv()
 
     if os.getenv("REDDIT_2FA", default="no").casefold() == "yes":
         print(
-            "\nEnter your two-factor authentication code from your authenticator app.\n"
+            "\nEnter your two-factor authentication code from your authenticator app.\n", end=" "
         )
         code = input("> ")
-        print()
         pw = os.getenv("REDDIT_PASSWORD")
         passkey = f"{pw}:{code}"
     else:
         passkey = os.getenv("REDDIT_PASSWORD")
 
     content = {}
-    reddit = praw.Reddit(
-        client_id=os.getenv("REDDIT_CLIENT_ID"),
-        client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
-        user_agent="Accessing AskReddit threads",
-        username=os.getenv("REDDIT_USERNAME"),
-        password=passkey,
-    )
+    try:
+        reddit = praw.Reddit(
+            client_id=os.getenv("REDDIT_CLIENT_ID").strip(),
+            client_secret=os.getenv("REDDIT_CLIENT_SECRET").strip(),
+            user_agent="Accessing AskReddit threads",
+            username=os.getenv("REDDIT_USERNAME").strip(),
+            password=passkey.strip(),
+        )
+    except (
+            OAuthException,
+            ResponseException,
+            RequestException,
+            BadRequest
+        ):
+        console.print(
+            "[bold red]There is something wrong with the .env file, kindly check:[/bold red]\n"
+            + "1. ClientID\n"
+            + "2. ClientSecret\n"
+            + "3. If these variables are fine, kindly check other variables."
+            + "4. Check if the type of Reddit app created is script (personal use script)."
+        )
 
-    # If the user specifies that he doesnt want a random thread, or if he doesn't insert the "RANDOM_THREAD" variable at all, ask the thread link
-    if not os.getenv("RANDOM_THREAD") or os.getenv("RANDOM_THREAD") == "no":
-        print_substep("Insert the full thread link:", style="bold green")
-        thread_link = input()
+
+    # If the user specifies that he doesnt want a random thread, or if
+    # he doesn't insert the "RANDOM_THREAD" variable at all, ask the thread link
+    if thread_link_ is not None:
+        thread_link = thread_link_
         print_step("Getting the inserted thread...")
         submission = reddit.submission(url=thread_link)
     else:
-        # Otherwise, picks a random thread from the inserted subreddit
-        if os.getenv("SUBREDDIT"):
-            subreddit = reddit.subreddit(re.sub(r"r\/", "", os.getenv("SUBREDDIT")))
-        else:
-            # ! Prompt the user to enter a subreddit
-            try:
+        try:
+            if subreddit_ is None:
+                raise ValueError
+
+            subreddit = reddit.subreddit(subreddit_)
+        except ValueError:
+            if os.getenv("SUBREDDIT"):
                 subreddit = reddit.subreddit(
-                    re.sub(
-                        r"r\/",
-                        "",
-                        input("What subreddit would you like to pull from? "),
-                    )
+                    re.sub(r"r\/", "", os.getenv("SUBREDDIT").strip())
                 )
-            except ValueError:
+            else:
                 subreddit = reddit.subreddit("askreddit")
                 print_substep("Subreddit not defined. Using AskReddit.")
 
         threads = subreddit.hot(limit=25)
         submission = list(threads)[random.randrange(0, 25)]
 
-    print_substep(f"Video will be: {submission.title} :thumbsup:")
-    console.log("Getting video comments...")
+    print_substep(f"Video will be: [cyan]{submission.title}[/cyan] :thumbsup:")
+
     try:
         content["thread_url"] = submission.url
         content["thread_title"] = submission.title
@@ -82,9 +104,9 @@ def get_subreddit_threads():
                         "comment_id": top_level_comment.id,
                     }
                 )
-
     except AttributeError:
         pass
-    print_substep("Received AskReddit threads successfully.", style="bold green")
+
+    print_substep("AskReddit threads retrieved successfully.", style="bold green")
 
     return content
