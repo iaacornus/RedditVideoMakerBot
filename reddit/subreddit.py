@@ -15,7 +15,7 @@ from rich.console import Console
 from utils.console import print_step, print_substep
 
 
-def get_subreddit_threads(subreddit_, thread_link_):
+def get_subreddit_threads(subreddit_, thread_link_, number_of_comments):
     """
     Takes subreddit_ as parameter which defaults to None, but in this
     case since it is None, it would raise ValueError, thus defaulting
@@ -65,27 +65,43 @@ def get_subreddit_threads(subreddit_, thread_link_):
 
     # If the user specifies that he doesnt want a random thread, or if
     # he doesn't insert the "RANDOM_THREAD" variable at all, ask the thread link
-    if thread_link_ is not None:
-        thread_link = thread_link_
-        print_step("Getting the inserted thread...")
-        submission = reddit.submission(url=thread_link)
-    else:
-        try:
-            if subreddit_ is None:
-                raise ValueError
+    while True:
+        if thread_link_ is not None:
+            thread_link = thread_link_
+            print_step("Getting the inserted thread...")
+            submission = reddit.submission(url=thread_link)
+        else:
+            try:
+                if subreddit_ is None:
+                    raise ValueError
 
-            subreddit = reddit.subreddit(subreddit_)
-        except ValueError:
-            if os.getenv("SUBREDDIT"):
                 subreddit = reddit.subreddit(
-                    re.sub(r"r\/", "", os.getenv("SUBREDDIT").strip())
+                    re.sub(r"r\/", "", subreddit_.strip())
                 )
-            else:
-                subreddit = reddit.subreddit("askreddit")
-                print_substep("Subreddit not defined. Using AskReddit.")
+            except ValueError:
+                if os.getenv("SUBREDDIT"):
+                    subreddit = reddit.subreddit(
+                        re.sub(r"r\/", "", os.getenv("SUBREDDIT").strip())
+                    )
+                else:
+                    subreddit = reddit.subreddit("askreddit")
+                    print_substep("Subreddit not defined. Using AskReddit.")
 
-        threads = subreddit.hot(limit=25)
-        submission = list(threads)[random.randrange(0, 25)]
+            threads = subreddit.hot(limit=25)
+            submission = list(threads)[random.randrange(0, 25)]
+
+        try:
+            with open("created_videos", "r", encoding="utf-8") as reference:
+                videos = list(reference.readlines())
+
+            if submission.title in videos:
+                print_substep(
+                    "[bold]There is already a video for thread: [cyan]"
+                    + f"{submission.title}[/cyan]. Finding another one.[/bold]"
+                )
+                continue
+        except FileNotFoundError:
+            break
 
     print_substep(f"Video will be: [cyan]{submission.title}[/cyan] :thumbsup:")
 
@@ -95,7 +111,12 @@ def get_subreddit_threads(subreddit_, thread_link_):
         content["thread_post"] = submission.selftext
         content["comments"] = []
 
+        comment_count = 0
         for top_level_comment in submission.comments:
+            if number_of_comments is not None:
+                if comment_count == number_of_comments:
+                    break
+
             if not top_level_comment.stickied:
                 content["comments"].append(
                     {
@@ -104,9 +125,10 @@ def get_subreddit_threads(subreddit_, thread_link_):
                         "comment_id": top_level_comment.id,
                     }
                 )
+            count += 1
     except AttributeError:
         pass
 
-    print_substep("AskReddit threads retrieved successfully.", style="bold green")
+    print_substep("AskReddit threads retrieved successfully.", style_="bold green")
 
     return content

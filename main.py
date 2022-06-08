@@ -2,8 +2,8 @@ import os
 import shutil
 
 from dotenv import load_dotenv
-from rich.console import Console
 
+import reddit.subreddit
 from reddit.subreddit import get_subreddit_threads
 from video_creation.background import download_background, chop_background_video
 from video_creation.voices import save_text_to_mp3
@@ -13,15 +13,19 @@ from utils.console import print_markdown, print_substep
 from setup_program import setup
 
 
-def main(subreddit_=None, background=None, filename=None, thread_link_=None):
+def main(
+        subreddit_=None,
+        background=None,
+        filename=None,
+        thread_link_=None,
+        number_of_comments=None
+    ):
     """
     Load .env file if exists. If it doesnt exist, print a warning and
     launch the setup wizard. If there is a .env file, check if the
     required variables are set. If not, print a warning and launch the
     setup wizard.
     """
-
-    console = Console()
     load_dotenv()
 
     REQUIRED_VALUES = [
@@ -40,36 +44,26 @@ def main(subreddit_=None, background=None, filename=None, thread_link_=None):
 
     if not os.path.exists(".env"):
         shutil.copy(".env.template", ".env")
-        console.print(
-            "[bold red] The .env file is invalid. Creating .env file.[/bold red]"
-        )
+        print_substep("The .env file is invalid. Creating .env file.", style_="bold red")
 
-    console.print("[bold]Checking environment variables...[/bold]")
+    print_substep("Checking environment variables ...", style_="bold")
 
     configured = True
     for val in REQUIRED_VALUES:
         if not os.getenv(val):
             print_substep(
-                f"Please set the variable \"{val}\" in your .env file.", style="bold red"
+                f"Please set the variable \"{val}\" in your .env file.", style_="bold red"
             )
             configured = False
 
-    try:
-        float(os.getenv("OPACITY"))
-    except (
-            ValueError,
-            FloatingPointError,
-            TypeError,
-        ):
-        console.print(
-            "[bold red]Please ensure that OPACITY is between 0 and 1 in .env file.[/bold red]"
-        )
-        raise SystemExit()
-
     if configured:
-        console.print("[bold green]Enviroment Variables are set! Continuing...[/bold green]")
+        print_substep("Enviroment Variables are set! Continuing ...", style_="bold green")
 
-        reddit_object = get_subreddit_threads(subreddit_, thread_link_)
+        reddit_object = get_subreddit_threads(
+            subreddit_,
+            thread_link_,
+            number_of_comments
+        )
         length, number_of_comments = save_text_to_mp3(reddit_object)
         download_screenshots_of_reddit_posts(
             reddit_object,
@@ -79,11 +73,17 @@ def main(subreddit_=None, background=None, filename=None, thread_link_=None):
         download_background(background)
         chop_background_video(length)
         make_final_video(number_of_comments, filename)
-    else:
-        console.print(
-            "[bold red]Looks like you need to set your Reddit credentials in the .env file. "
-            + "Please follow the instructions in the README.md file to set them up.[/bold red]"
-        )
-        setup_ask = input("\033[1mLaunch setup wizard? [y/N] > \033[0m")
-        if setup_ask in ["y", "Y"]:
-            setup()
+
+        with open("created_videos", "a", encoding="utf-8") as video_lists:
+            video_lists.write(reddit.subreddit.submission.title)
+
+        return True
+
+    print_substep(
+        "Looks like you need to set your Reddit credentials in the .env file. Please follow "
+        + "the instructions in the README.md file to set them up.", style_="bold red"
+    )
+    if input("\033[1mLaunch setup wizard? [y/N] > \033[0m").strip() in ["y", "Y"]:
+        setup()
+
+    return False

@@ -29,42 +29,42 @@ def download_background(background):
     }
 
     background_check = os.path.isfile("assets/mp4/background.mp4")
-    if background is not None or not background_check:
-        if background_check and background is not None:
-            print_substep(
-                "Background video is already downloaded! Replacing ...", style="bold red"
-            )
-            os.remove("assets/mp4/background.mp4")
+    if background_check and background is not None:
+        print_substep(
+            "Background video is already downloaded! Replacing ...", style_="bold red"
+        )
+        os.remove("assets/mp4/background.mp4")
 
-        cancel = True
-        try:
-            with YoutubeDL(ydl_opts) as ydl:
-                if background is None:
-                    ydl.download("https://www.youtube.com/watch?v=n_Dv4JMiwK8")
-                elif background is not None:
-                    check_link = re.match(
-                        "https://www.youtube.com/watch?v*", background.strip()
-                    ) or re.match(
-                        "https://youtu.be/*", background.strip()
-                    )
+    cancel = True
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            if background is None:
+                ydl.download("https://www.youtube.com/watch?v=n_Dv4JMiwK8")
+            elif background is not None:
+                check_link = re.match(
+                    "(?:https?:\/\/)?(?:www\.)?youtu(?:\.be\/|be.com\/"
+                    + "\S*(?:watch|embed)(?:(?:(?=\/[-a-zA-Z0-9_]{11,}(?!"
+                    + "\S))\/)|(?:\S*v=|v\/)))([-a-zA-Z0-9_]{11,})"
+                    , background.strip()
+                )
 
-                    if check_link:
-                        print_substep(f"Downloading video from: {background}", style="bold")
-                        ydl.download(background)
-                    elif re.match(background[-4], "mp4"):
-                        print_substep(f"Using the given video file: {background}", style="bold")
-                        os.replace(background.strip(), "assets/mp4/background.mp4")
-                    else: # if the link is not youtube link or  a file
-                        raise ValueError
-        except ValueError:
-            print_substep("Invalid input!", style="bold red")
-        except ConnectionError:
-            print_substep("There is a connection error!", style="bold red")
-        except DownloadError:
-            print_substep("There is a download error!", style="bold red")
-        else:
-            print_substep("Background video downloaded successfully!", style="bold green")
-            cancel = False
+                if check_link:
+                    print_substep(f"Downloading video from: {background}", style_="bold")
+                    ydl.download(background)
+                elif re.match(background[-4], "mp4"):
+                    print_substep(f"Using the given video file: {background}", style_="bold")
+                    os.replace(background.strip(), "assets/mp4/background.mp4")
+                else: # if the link is not youtube link or  a file
+                    raise ValueError
+    except ValueError:
+        print_substep("Invalid input!", style_="bold red")
+    except ConnectionError:
+        print_substep("There is a connection error!", style_="bold red")
+    except DownloadError:
+        print_substep("There is a download error!", style_="bold red")
+    else:
+        print_substep("Background video downloaded successfully!", style_="bold green")
+        cancel = False
 
         if cancel:
             # to prevent further error and processes from happening
@@ -82,4 +82,4 @@ def chop_background_video(video_length):
         end_time,
         targetname="assets/mp4/clip.mp4",
     )
-    print_substep("Background video chopped successfully!", style="bold green")
+    print_substep("Background video chopped successfully!", style_="bold green")
